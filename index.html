@@ -15,12 +15,12 @@
       margin-bottom: 30px;
     }
     .ring-group {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 40px;
-  margin-bottom: 40px;
-}
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
     svg {
       transform: rotate(-90deg);
     }
@@ -210,7 +210,6 @@
           const relay3Status = message.toString();
           document.getElementById("relay3Switch").checked = (relay3Status === "on");
 
-          // Aktifkan atau nonaktifkan tombol 1 dan 2 berdasarkan status relay 3
           const disableRelay1And2 = relay3Status === "on";
           document.getElementById("relay1Switch").disabled = disableRelay1And2;
           document.getElementById("relay2Switch").disabled = disableRelay1And2;
@@ -228,14 +227,14 @@
     }
 
     function kirim(topik, status) {
-  client.publish(topik, status);
+      client.publish(topik, status);
 
-  if (topik === "AERO_PONIK/RELAY3") {
-    const disableRelay1And2 = status === "on";
-    document.getElementById("relay1Switch").disabled = disableRelay1And2;
-    document.getElementById("relay2Switch").disabled = disableRelay1And2;
-  }
-}
+      if (topik === "AERO_PONIK/RELAY3") {
+        const disableRelay1And2 = status === "on";
+        document.getElementById("relay1Switch").disabled = disableRelay1And2;
+        document.getElementById("relay2Switch").disabled = disableRelay1And2;
+      }
+    }
 
     function setThreshold(topik, nilai) {
       client.publish(topik, nilai.toString());
