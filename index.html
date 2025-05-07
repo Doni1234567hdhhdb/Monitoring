@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AERO_PONIK Ring Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f5f5f5;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h2 {
+      margin-bottom: 30px;
+    }
+    .ring-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+    svg {
+      transform: rotate(-90deg);
+    }
+    .ring {
+      position: relative;
+      width: 120px;
+      height: 120px;
+    }
+    .ring circle {
+      fill: none;
+      stroke-width: 10;
+    }
+    .ring-bg {
+      stroke: #ccc;
+    }
+    .ring-fg {
+      stroke: #007bff;
+      stroke-linecap: round;
+      stroke-dasharray: 314;
+      stroke-dashoffset: 314;
+      transition: stroke-dashoffset 0.5s;
+    }
+    .ring-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.1em;
+      font-weight: bold;
+    }
+    .relay-group {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 20px;
+    }
+    .relay-box {
+      text-align: center;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      background-color: red;
+      border-radius: 34px;
+      top: 0; left: 0;
+      right: 0; bottom: 0;
+      transition: .4s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px; width: 26px;
+      left: 4px; bottom: 4px;
+      background-color: white;
+      border-radius: 50%;
+      transition: .4s;
+    }
+    input:checked + .slider {
+      background-color: green;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .threshold-group {
+      margin-top: 30px;
+    }
+    .threshold-box {
+      margin-bottom: 15px;
+    }
+    input[type=number] {
+      width: 80px;
+      padding: 5px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h2>Aero Ponik Monitoring</h2>
+  <div class="ring-group">
+    <div class="ring">
+      <svg width="120" height="120">
+        <circle class="ring-bg" cx="60" cy="60" r="50" />
+        <circle class="ring-fg" id="suhuRing" cx="60" cy="60" r="50" />
+      </svg>
+      <div class="ring-label" id="suhuText">--°C</div>
+    </div>
+    <div class="ring">
+      <svg width="120" height="120">
+        <circle class="ring-bg" cx="60" cy="60" r="50" />
+        <circle class="ring-fg" id="lembabRing" cx="60" cy="60" r="50" />
+      </svg>
+      <div class="ring-label" id="lembabText">--%</div>
+    </div>
+    <div class="ring">
+      <svg width="120" height="120">
+        <circle class="ring-bg" cx="60" cy="60" r="50" />
+        <circle class="ring-fg" id="jarakRing" cx="60" cy="60" r="50" />
+      </svg>
+      <div class="ring-label" id="jarakText">--cm</div>
+    </div>
+  </div>
+
+  <div class="relay-group">
+    <div class="relay-box">
+      <label>Kipas</label><br>
+      <label class="switch">
+        <input type="checkbox" id="relay1Switch" onchange="kirim('AERO_PONIK/RELAY1', this.checked ? 'on' : 'off')">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="relay-box">
+      <label>Embun</label><br>
+      <label class="switch">
+        <input type="checkbox" id="relay2Switch" onchange="kirim('AERO_PONIK/RELAY2', this.checked ? 'on' : 'off')">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="relay-box">
+      <label>Otomatis</label><br>
+      <label class="switch">
+        <input type="checkbox" id="relay3Switch" onchange="kirim('AERO_PONIK/RELAY3', this.checked ? 'on' : 'off')">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="threshold-group">
+    <div class="threshold-box">
+      <label>Humidity Threshold (%): </label>
+      <input type="number" id="humidityInput" value="65">
+      <button onclick="setThreshold('AERO_PONIK/SET_HUMIDITY_THRESHOLD', humidityInput.value)">SET</button>
+    </div>
+    <div class="threshold-box">
+      <label>Distance Threshold (cm): </label>
+      <input type="number" id="distanceInput" value="8">
+      <button onclick="setThreshold('AERO_PONIK/SET_DISTANCE_THRESHOLD', distanceInput.value)">SET</button>
+    </div>
+  </div>
+
+  <script>
+    const options = {
+      username: "Mas_JP",
+      password: "MasJP2509",
+      protocol: "wss",
+      clientId: "web_" + Math.random().toString(16).substr(2, 8),
+      clean: true,
+      connectTimeout: 4000,
+    };
+
+    const client = mqtt.connect(
+      "wss://7dca25680bd841b5ae94a4572133f561.s1.eu.hivemq.cloud:8884/mqtt",
+      options
+    );
+
+    client.on("connect", () => {
+      client.subscribe("AERO_PONIK/DATA");
+      client.subscribe("AERO_PONIK/RELAY1/STATUS");
+      client.subscribe("AERO_PONIK/RELAY2/STATUS");
+      client.subscribe("AERO_PONIK/RELAY3/STATUS");
+    });
+
+    client.on("message", (topic, message) => {
+      try {
+        if (topic === "AERO_PONIK/DATA") {
+          const data = JSON.parse(message.toString());
+          updateRing("suhuRing", "suhuText", data.suhu, 60, "°C");
+          updateRing("lembabRing", "lembabText", data.lembab, 100, "%");
+          updateRing("jarakRing", "jarakText", data.jarak, 200, "cm");
+        } else if (topic === "AERO_PONIK/RELAY1/STATUS") {
+          document.getElementById("relay1Switch").checked = (message.toString() === "on");
+        } else if (topic === "AERO_PONIK/RELAY2/STATUS") {
+          document.getElementById("relay2Switch").checked = (message.toString() === "on");
+        } else if (topic === "AERO_PONIK/RELAY3/STATUS") {
+          const relay3Status = message.toString();
+          document.getElementById("relay3Switch").checked = (relay3Status === "on");
+
+          // Aktifkan atau nonaktifkan tombol 1 dan 2 berdasarkan status relay 3
+          const disableRelay1And2 = relay3Status === "on";
+          document.getElementById("relay1Switch").disabled = disableRelay1And2;
+          document.getElementById("relay2Switch").disabled = disableRelay1And2;
+        }
+      } catch (e) {
+        console.error("Format tidak valid:", message.toString());
+      }
+    });
+
+    function updateRing(id, labelId, value, max, satuan) {
+      const circle = document.getElementById(id);
+      const offset = 314 - (314 * value / max);
+      circle.style.strokeDashoffset = offset;
+      document.getElementById(labelId).innerText = value + satuan;
+    }
+
+    function kirim(topik, status) {
+  client.publish(topik, status);
+
+  if (topik === "AERO_PONIK/RELAY3") {
+    const disableRelay1And2 = status === "on";
+    document.getElementById("relay1Switch").disabled = disableRelay1And2;
+    document.getElementById("relay2Switch").disabled = disableRelay1And2;
+  }
+}
+
+    function setThreshold(topik, nilai) {
+      client.publish(topik, nilai.toString());
+      alert(`Threshold dikirim: ${nilai}`);
+    }
+  </script>
+</body>
+</html>
